@@ -1,0 +1,8 @@
+# Local smoke environment used Python 3.11, numpy 1.26.4, torch 2.6.0+cu124,
+# matplotlib 3.8.4, tables 3.9.2 and psutil 5.9.0. This is not a frozen
+# training environment; select a PyTorch build for the available CPU/CUDA.
+numpy>=1.26,<2
+torch>=2.6,<3
+matplotlib>=3.8,<4
+tables>=3.9,<4
+psutil>=5.9,<7
