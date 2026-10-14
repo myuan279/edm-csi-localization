@@ -1,57 +1,51 @@
-# EDM-Loc: probabilistic localization from LTE CSI
+# EDM-Loc: More Accurate Probabilistic Localization with Fewer Denoiser Evaluations
 
-Source release for the manuscript *EDM-Loc: More Accurate Probabilistic
-Localization with Fewer Denoiser Evaluations* (ICASSP 2027 submission).
+Code for the manuscript *EDM-Loc: More Accurate Probabilistic Localization with Fewer Denoiser Evaluations* (ICASSP 2027 submission).
 
 ## Overview
 
-EDM-Loc estimates a distribution of 2D positions from LTE channel state
-information (CSI). The proposed conditional EDM model uses a 312-value
-real/imaginary CSI representation and generates 20 position samples per input
-at the paper's default 63 denoiser evaluations. The included comparisons are
-the eight methods in Table 1; they use the same paper-specific CSI setting.
+EDM-Loc estimates a position distribution from measured LTE channel state information (CSI). It combines feature-wise CSI conditioning, noise-dependent preconditioning, and a second-order sampler to produce accurate location estimates with fewer denoiser evaluations. The model represents CSI through its real and imaginary components and draws multiple position samples to describe both the estimated location and its uncertainty.
 
 ![EDM-Loc method overview](figures/figure_1_edm_loc_overview.png)
 
-**Release status.** The model definitions, portable EDM-Loc Train/Development
-retraining and explicit evaluation entry points, and the three manuscript PNG
-figures are included. Original OpenCSI arrays, frozen paper checkpoints,
-calibration artifacts, full prediction arrays and figure source data are **not**
-redistributed here. Running `scripts/train_edm_loc.py` creates a new run; it
-does not recreate or overwrite the paper's formal Test evidence.
+### Key contributions
+
+- **CSI-conditioned localization:** A feature-wise conditioning strategy connects measured CSI to the position denoiser.
+- **Probabilistic predictions:** EDM preconditioning and multiple position samples support both location estimates and uncertainty assessment.
+- **Efficient sampling:** A second-order sampler reduces the number of denoiser evaluations needed for accurate localization.
+
+## Paper results
+
+The manuscript evaluates EDM-Loc on measured LTE CSI, with training, development, calibration, and test reference points kept separate. Its main comparison includes eight other methods: DDPM-Loc, iCT, MeanFlow, FullCov, GlobalCov, MLP, CNN, and KNN. In Table 1, EDM-Loc has the lowest reported RP-macro mean error (41.93 cm) and RP-macro P90 error (58.49 cm) among the evaluated methods, as well as the lowest energy score (32.65 cm) among methods that report it.
+
+### Accuracy and sampling budget
+
+![Figure 2: localization error versus denoiser evaluations](figures/figure_2_sampling_budget.png)
+
+Figure 2 compares test-set localization error at different sampling budgets. With 13 denoiser evaluations, EDM-Loc reaches 43.14 cm RP-macro mean error and 61.30 cm RP-macro P90 error. Both are below DDPM-Loc at 50 evaluations (51.16 cm and 68.72 cm), using 37 fewer evaluations. The horizontal axis counts denoiser calls, not elapsed time.
+
+### Calibrated prediction regions
+
+![Figure 3: calibrated prediction-region areas and paired examples](figures/figure_3_calibrated_regions.png)
+
+Figure 3 compares the areas of nominal 90% prediction regions and shows three paired test examples. EDM-Loc has smaller regions over the lower and central parts of the area distribution. In each paired example, its regions are smaller than DDPM-Loc's for the same observation and plot scale. Region size should be read together with empirical coverage; smaller regions alone do not establish better calibration. At higher area percentiles, iCT and MeanFlow can have smaller regions.
+
+These figures are exports from the manuscript experiments. The original measurements, trained paper checkpoints, calibration results, and figure source data are not included, so the images cannot be regenerated from this repository alone.
 
 ## Methods and repository layout
 
-| Path | Purpose |
+| Path | What it contains |
 |---|---|
-| `src/edm_loc/` | Proposed EDM-Loc, RI conversion, conditional FiLM denoiser, EDM loss and Heun sampler |
-| `src/paper_baselines/` | All eight Table 1 comparison methods, including DDPM-Loc, iCT, MeanFlow, FullCov, GlobalCov, MLP, CNN and paper-matched RP-prototype KNN |
-| `src/paper_baselines/ict/` | Paper iCT model, objective, training and evaluation source |
-| `src/paper_baselines/meanflow/` | Paper MeanFlow model, objective, training and evaluation source |
-| `scripts/train_edm_loc.py`, `scripts/evaluate_edm_loc.py` | Portable new-run EDM utilities for explicit NPZ inputs |
-| `scripts/smoke_test.py` | Data-free model and interface checks |
-| `figures/` | The three manuscript PNG figures |
-| `docs/METHODS_AND_EVIDENCE.md` | Method-to-source map and evidence boundaries |
+| `src/edm_loc/` | The proposed model, CSI conversion, training objective, and sampler |
+| `src/paper_baselines/` | Implementations of the eight comparison methods in Table 1 |
+| `scripts/` | Entrypoints for new EDM-Loc training, evaluation, metric averaging, and basic checks |
+| `figures/` | The three manuscript figures shown above |
 
-The proposed method is **EDM-Loc**. The eight comparison methods in Table 1
-are DDPM-Loc, iCT, MeanFlow, FullCov, GlobalCov, MLP, CNN and KNN. The public
-KNN uses one mean fingerprint per Train RP, squared Euclidean distance and
-`k=1`. The public MLP defaults to 312 RI inputs. The iCT and MeanFlow
-directories have method-based names; their historical protocol IDs remain in
-the source so the original experiment records stay traceable.
+The comparison methods cover diffusion sampling (DDPM-Loc), one-step generation (iCT and MeanFlow), Gaussian prediction (FullCov and GlobalCov), and point prediction (MLP, CNN, and KNN). See the [method and evidence map](docs/METHODS_AND_EVIDENCE.md) for implementation details and the limits of the released material.
 
-| Role | Method | Implementation |
-|---|---|---|
-| Proposed | EDM-Loc | `src/edm_loc/` |
-| Diffusion comparison | DDPM-Loc | `src/paper_baselines/ddpm_loc.py` |
-| One-step comparisons | iCT, MeanFlow | `src/paper_baselines/ict/`, `src/paper_baselines/meanflow/` |
-| Probabilistic regression | FullCov, GlobalCov | `src/paper_baselines/gaussian.py` |
-| Point regression | MLP, CNN, KNN | `src/paper_baselines/mlp.py`, `cnn.py`, `knn.py` |
+## Getting started
 
-## Quick start
-
-Use Python 3.11 or a compatible Python 3 version. Install a PyTorch build for
-your CPU or CUDA environment, then:
+Use Python 3.11 or a compatible Python 3 version. Install a PyTorch build suitable for your CPU or CUDA environment, then install the remaining dependencies:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -59,74 +53,46 @@ python scripts/smoke_test.py
 python scripts/verify_release.py
 ```
 
-The `figures/*.png` files are the manuscript art. Figure source data and the
-editable design source for Figure 1 are not included.
+The smoke check runs without the OpenCSI data. Training and evaluation require you to prepare the data described below.
 
-## Input contract for new EDM runs
+## Train and evaluate three new runs
 
-Prepare **separate** Train and Development `.npz` files, each with:
+Prepare separate training, development, and held-out evaluation `.npz` files. Each file needs four arrays:
 
 | Array | Shape | Meaning |
 |---|---|---|
-| `raw_ap` | `[N,2,39,4]` | OpenCSI amplitude and phase, in that order |
-| `coordinates_cm` | `[N,2]` | Physical coordinates in centimeters |
+| `raw_ap` | `[N, 2, 39, 4]` | CSI amplitude and phase, in that order |
+| `coordinates_cm` | `[N, 2]` | Position in centimeters |
 | `rp_ids` | `[N]` | Reference-point IDs |
 | `global_uids` | `[N]` | Unique snapshot IDs |
 
-RP IDs and UIDs must be disjoint across Train and Development. The training
-script fits CSI and coordinate normalization on Train only, then applies it to
-Development. To compare with the paper, use its frozen 2,509/398/279/399 RP
-Train/Development/Calibration/Test partition and the same selected input
-subsets. Supplying another split or feature normalization defines a new
-experiment.
+The training and development sets must have distinct reference points and snapshot IDs. The training script learns CSI and coordinate normalization from the training set only, then applies it to development data. Keep the same held-out evaluation file for all three seeds. If you want to compare new results with the manuscript, use the paper's reference-point split (2,509 training / 398 development / 279 calibration / 399 test RPs) and the same input selection; a different split is a different experiment.
+
+Run the three seeds separately. The following Bash example trains each model, evaluates its selected checkpoint on the same held-out file, and writes results to separate directories:
+
+Both commands use CUDA by default. Add `--device cpu` to each command when running without a CUDA GPU.
 
 ```bash
-python scripts/train_edm_loc.py \
-  --train-npz data/train.npz \
-  --development-npz data/development.npz \
-  --output-dir outputs/edm_seed2031 \
-  --seed 2031
+for seed in 2031 2032 2033; do
+  python scripts/train_edm_loc.py \
+    --train-npz data/train.npz \
+    --development-npz data/development.npz \
+    --output-dir "outputs/edm_seed${seed}" \
+    --seed "$seed"
 
-python scripts/evaluate_edm_loc.py \
-  --checkpoint outputs/edm_seed2031/best_checkpoint.pt \
-  --input-npz data/evaluation.npz \
-  --output-dir outputs/evaluation_seed2031
+  python scripts/evaluate_edm_loc.py \
+    --checkpoint "outputs/edm_seed${seed}/best_checkpoint.pt" \
+    --input-npz data/evaluation.npz \
+    --output-dir "outputs/evaluation_seed${seed}"
+done
+
+python scripts/average_edm_metrics.py \
+  outputs/evaluation_seed2031/metrics.json \
+  outputs/evaluation_seed2032/metrics.json \
+  outputs/evaluation_seed2033/metrics.json \
+  --output outputs/three_seed_metrics.json
 ```
 
-The training defaults match the recorded 200 epochs, batch size 1,024,
-AdamW learning rate `3e-4`, weight decay `1e-4`, EMA `0.9999` and selection
-every ten epochs. It selects on Development ES, then pooled Mean, matching the
-recorded checkpoint key. The evaluation utility reports RP-macro Mean/P90 and unbiased ES with 20 samples
-at 63 actual NFE. For three-seed paper-style reporting, run seeds 2031, 2032
-and 2033 separately and average their metrics. The script does not fit a
-calibrator or report prediction-region coverage; those require the separate
-Calibration panel and frozen calibrator artifacts.
+Each evaluation reports localization error and energy score for its own model. The final command takes the arithmetic mean of each reported metric across the three seeds and checks that all three results used the same input file. The default sampler draws 20 positions per input with 63 denoiser evaluations per trajectory. Training uses development results to select a checkpoint; evaluation does not fit a prediction-region calibrator. Reproducing the manuscript's calibrated regions requires the separate calibration data and artifacts.
 
-## Paper result provenance
-
-The manuscript's Table 1 and Figures 2–3 are historical results, not outputs
-claimed by the new portable scripts. Only final PNG figure exports are
-included; the plotted Test values and paired sample data are not distributed.
-See [method and evidence map](docs/METHODS_AND_EVIDENCE.md) before comparing
-new results with the manuscript.
-
-| Figure | Manuscript image |
-|---|---|
-| 1: model overview | [PNG](figures/figure_1_edm_loc_overview.png) |
-| 2: sampling budget | [PNG](figures/figure_2_sampling_budget.png) |
-| 3: calibrated regions | [PNG](figures/figure_3_calibrated_regions.png) |
-
-## Data, checkpoints and reuse
-
-OpenCSI must be obtained under its own terms from its dataset provider. This
-release does not contain original measurements or the manuscript's trained
-weights. [Source provenance](docs/SOURCE_PROVENANCE.md) records where adapted
-implementation files came from in the local research workspace, and
-`SOURCE_MANIFEST.tsv` records release-file hashes. No open-source license has
-been selected for this package; the authors should settle code ownership and
-third-party attribution before publishing it as an openly reusable repository.
-
-## Citation
-
-If you use this implementation, cite the associated EDM-Loc manuscript. A
-final BibTeX entry should be added when the publication details are confirmed.
+These commands create new models and new evaluations. Their outputs are not the manuscript's frozen test results.

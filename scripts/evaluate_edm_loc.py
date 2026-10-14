@@ -7,6 +7,7 @@ not update the original project's protected-stage ledger or paper evidence.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -19,6 +20,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from edm_loc.conditional_diffusion import EDMConditionalDiffusion, build_registered_denoiser, registered_edm_config
 from edm_loc.targets import TargetTransform
 from edm_loc.npz_data import load_arrays, make_batch, normalized_ri, sample_metrics
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def main() -> None:
@@ -56,7 +65,15 @@ def main() -> None:
     metrics = sample_metrics(posterior, arrays.coordinates_cm, arrays.rp_ids)
     args.output_dir.mkdir(parents=True, exist_ok=False)
     np.savez_compressed(args.output_dir / "predictions.npz", posterior_samples_cm=posterior, truth_cm=arrays.coordinates_cm, rp_ids=arrays.rp_ids, global_uids=arrays.global_uids)
-    (args.output_dir / "metrics.json").write_text(json.dumps({"metrics": metrics, "actual_nfe": 63, "samples_per_input": 20, "status": "new_public_evaluation_not_historical_formal_result"}, indent=2) + "\n", encoding="utf-8")
+    report = {
+        "seed": int(checkpoint["seed"]),
+        "input_npz_sha256": sha256(args.input_npz),
+        "metrics": metrics,
+        "actual_nfe": 63,
+        "samples_per_input": 20,
+        "status": "new_public_evaluation_not_historical_formal_result",
+    }
+    (args.output_dir / "metrics.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(metrics, indent=2))
 
 
